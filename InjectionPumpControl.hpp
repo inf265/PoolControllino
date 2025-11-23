@@ -10,7 +10,22 @@ enum class RunState : uint8_t
     MAXTIMEEXCEEDED
 };
 
-// Pumpe hat 1,5l/h
+/**
+ * @brief Controls injection pump with runtime tracking and water pump dependency
+ * 
+ * Injection pumps (pH and chlorine) can only run when:
+ * - Water pump is running
+ * - Water flow switch is active
+ * - No system errors
+ * - Water pump has been running for at least waterPumpRuntimeBeforeInjection
+ * 
+ * The pump uses a cycle-based approach:
+ * - Runs for pumpCycleRunTime, then pauses for pumpCyclePauseTime
+ * - Tracks total daily runtime to enforce pumpMaxRuntime limit
+ * - Resets daily runtime tracking on first switch-on each day
+ * 
+ * Pump flow rate: 1.5 l/h
+ */
 class InjectionPumpControl
 {
 public:
@@ -39,20 +54,30 @@ public:
         this->currentCycleRuntime = TimeSpan(0);
     }
 
+    /**
+     * @brief Request pump to turn on
+     * 
+     * Pump will only run if all prerequisites are met:
+     * - Water pump is running
+     * - Water flow switch is active
+     * - No system errors
+     * - Water pump has been running long enough
+     * - Daily max runtime not exceeded
+     */
     void on()
     {
-        // we do not inject if the water Pump is not running
-        if (PoolControlContext::instance()->data.waterPumpState == false ||
-            PoolControlContext::instance()->data.waterFlowSwitch == false ||
-            PoolControlContext::instance()->data.error)
+        // CRITICAL: No injection when water pump is off
+        if (!canInject())
         {
             hasTodayAlreadySwitchedOn = false;
             runState = RunState::OFF; // also to get back from MAXTIMEEXCEEDED
             switchPump(LOW);
             return;
         }
-        // we do not inject when the water pump has not yet run for some time
-        DateTime elapsedAt = PoolControlContext::instance()->data.waterPumpRunningSince + PoolControlContext::instance()->config.waterPumpRuntimeBeforeInjection;
+        
+        // Wait for water pump to run for required time before allowing injection
+        DateTime elapsedAt = PoolControlContext::instance()->data.waterPumpRunningSince + 
+                             PoolControlContext::instance()->config.waterPumpRuntimeBeforeInjection;
         if (PoolControlContext::instance()->data.date < elapsedAt)
         {
             switchPump(LOW);
@@ -142,6 +167,11 @@ public:
         switchPump(LOW);
     }
 
+    /**
+     * @brief Maintain pump state - called regularly to handle water pump state changes
+     * 
+     * Resets runtime tracking when water pump stops to ensure clean state
+     */
     void maintain()
     {
         if (PoolControlContext::instance()->data.waterPumpState == false)
@@ -150,6 +180,11 @@ public:
             // Reset runtime tracking when water pump stops
             totalPumpRuntime = TimeSpan(0);
             currentCycleRuntime = TimeSpan(0);
+            // Turn off pump if water pump is off
+            if (running)
+            {
+                switchPump(LOW);
+            }
         }
     }
 
@@ -227,5 +262,15 @@ private:
     {
         digitalWrite(pumpPin, onOff);
         running = onOff == 0 ? false : true;
+    }
+
+    /**
+     * @brief Check if injection is allowed (water pump running, flow switch active, no errors)
+     */
+    bool canInject()
+    {
+        return PoolControlContext::instance()->data.waterPumpState == true &&
+               PoolControlContext::instance()->data.waterFlowSwitch == true &&
+               PoolControlContext::instance()->data.error == false;
     }
 };

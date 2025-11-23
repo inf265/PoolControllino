@@ -31,6 +31,16 @@ public:
                            PoolControlContext::instance()->config.phPumpCyclePauseTime,
                            PoolControlContext::instance()->config.phPumpMaxRuntime);
     }
+    /**
+     * @brief Run pH injection control
+     * 
+     * pH injection strategy:
+     * - Value-dependent: injects when pH is above target value
+     * - Stops when pH reaches target - hysteresis
+     * - Automatically stops when water pump is off (handled by InjectionPumpControl)
+     * - Uses cycle run/pause times to prevent over-injection
+     * - Max runtime limit prevents excessive injection
+     */
     void run()
     {
         values.add(PoolControlContext::instance()->data.phValue);
@@ -40,23 +50,32 @@ public:
         }
         PoolControlContext::instance()->data.phValueMedian = values.get();
 
-        if (values.get() > (float)8.8) // dont ask me why I took 8.8
+        float phValue = values.get();
+
+        // Handle invalid measurements (pH > 8.8 indicates sensor failure)
+        if (phValue > (float)8.8)
         {
-            // for failed measurements
             injectionPump.off();
         }
-        else if (values.get() > PoolControlContext::instance()->config.phTargetValue)
+        // pH is too high - need to inject acid to lower it
+        else if (phValue > PoolControlContext::instance()->config.phTargetValue)
         {
+            // Request injection - will only run if water pump is active
             injectionPump.on();
         }
-        else if (values.get() <= PoolControlContext::instance()->config.phTargetValue - PoolControlContext::instance()->config.phTargetValueHysterese)
+        // pH is at or below target - hysteresis - stop injection
+        else if (phValue <= PoolControlContext::instance()->config.phTargetValue - 
+                 PoolControlContext::instance()->config.phTargetValueHysterese)
         {
             injectionPump.off();
         }
+        // pH is in hysteresis zone - maintain current state
         else
         {
             injectionPump.maintain();
         }
+
+        // Update state for monitoring
         if (injectionPump.isOn())
         {
             PoolControlContext::instance()->data.phPumpState = 1;

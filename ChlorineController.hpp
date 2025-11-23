@@ -33,6 +33,18 @@ public:
                            PoolControlContext::instance()->config.chlorinePumpCyclePauseTime,
                            PoolControlContext::instance()->config.chlorinePumpMaxRuntime);
     }
+    /**
+     * @brief Run chlorine injection control
+     * 
+     * Chlorine injection strategy:
+     * - Maximum 45 minutes per day (enforced by InjectionPumpControl)
+     * - Distributed over water pump runtime using cycle run/pause times
+     * - Only active during configured time window (switchChlorOn to switchChlorOff)
+     * - Automatically stops when water pump is off (handled by InjectionPumpControl)
+     * 
+     * The injection pump will cycle: run for cycleRunTime, pause for cyclePauseTime
+     * This distributes the max 45 minutes over the water pump operating period.
+     */
     void run()
     {
         values.add(PoolControlContext::instance()->data.redoxValue);
@@ -43,9 +55,14 @@ public:
 
         PoolControlContext::instance()->data.redoxValueMedian = values.get();
 
+        // Chlorine injection is time-window based and distributed over water pump runtime
+        // The InjectionPumpControl ensures it only runs when water pump is active
         TimeOfDay now = PoolControlContext::instance()->data.date;
-        if (PoolControlContext::instance()->config.switchChlorOn < now && now < PoolControlContext::instance()->config.switchChlorOff)
+        if (PoolControlContext::instance()->config.switchChlorOn < now && 
+            now < PoolControlContext::instance()->config.switchChlorOff)
         {
+            // Request injection - will only run if water pump is active
+            // Max 45 minutes per day is enforced by InjectionPumpControl
             injectionPump.on();
         }
         else
@@ -53,6 +70,7 @@ public:
             injectionPump.off();
         }
 
+        // Update state for monitoring
         if (injectionPump.isOn())
         {
             PoolControlContext::instance()->data.redoxPumpState = 1;
