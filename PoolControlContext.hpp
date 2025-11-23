@@ -47,7 +47,7 @@ public:
                       phPumpMaxRuntime(0, 0, 30, 0),
                       chlorinePumpCycleRunTime(0, 0, 10, 0),
                       chlorinePumpCyclePauseTime(0, 1, 0, 0),
-                      chlorinePumpMaxRuntime(0, 8, 0, 0),
+                      chlorinePumpMaxRuntime(0, 0, 45, 0),
                       switchChlorOn(10, 0, 0),
                       switchChlorOff(17, 0, 0),
                       waterPumpRuntimeBeforeInjection(0, 0, 2, 0),
