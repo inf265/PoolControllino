@@ -5,6 +5,7 @@
 #include "PoolControl_Config.h"
 #include "PoolControlContext.hpp"
 #include "TimeOfDay.hpp"
+#include "RealTimeClock.hpp"
 
 #define WATERPUMP_PIN CONTROLLINO_R10
 
@@ -20,13 +21,38 @@ public:
     /**
      * @brief Run automatic water pump control
      * 
-     * If manual override is active, uses manual state instead of automatic schedule
+     * Priority order:
+     * 1. Error state: pump OFF (highest priority)
+     * 2. Freeze protection: if housing temp <= 0°C, pump ON (safety override)
+     * 3. Manual override: uses manual state
+     * 4. Schedule: uses time-based schedule
      */
     void run()
     {
         auto *ctx = PoolControlContext::instance();
         
-        // Check for manual override first
+        // 1. Error check - if error, pump must be OFF (highest priority)
+        if (ctx->data.error)
+        {
+            ctx->data.waterPumpState = 0;
+            digitalWrite(WATERPUMP_PIN, ctx->data.waterPumpState);
+            return;
+        }
+        
+        // 2. Freeze protection - if housing temperature is 0°C or below, force pump ON
+        // This is a safety feature to prevent freezing, overrides manual and schedule
+        if (ctx->data.housingTemperature <= 0.0)
+        {
+            if (ctx->data.waterPumpState == 0)
+            {
+                ctx->data.waterPumpRunningSince = ctx->data.date;
+            }
+            ctx->data.waterPumpState = 1;
+            digitalWrite(WATERPUMP_PIN, ctx->data.waterPumpState);
+            return;
+        }
+        
+        // 3. Check for manual override
         if (ctx->data.waterPumpManualOverride)
         {
             // Check if manual override timeout has elapsed
@@ -55,13 +81,17 @@ public:
             // If timeout occurred, fall through to automatic control
         }
         
-        // Automatic control based on time schedule
+        // 4. Automatic control based on time schedule
         if (ctx->config.switchOn == ctx->config.switchOff)
         {
+            ctx->data.waterPumpState = 0;
+            digitalWrite(WATERPUMP_PIN, ctx->data.waterPumpState);
             return;
         }
         if (ctx->config.switchOn > ctx->config.switchOff)
         {
+            ctx->data.waterPumpState = 0;
+            digitalWrite(WATERPUMP_PIN, ctx->data.waterPumpState);
             return;
         }
         TimeOfDay now = ctx->data.date;
@@ -77,10 +107,9 @@ public:
         {
             ctx->data.waterPumpState = 0;
         }
-        // next "if" will not switch the pump off when it just started but
-        // the flowswitch is still of for a small amount of time. Anyway, after that
-        // time, when the flowswitch goes off suddely, we will switch the pump off
-        // and go into error state
+        
+        // Flow switch safety check: if pump is on but flow switch is off for too long,
+        // turn pump off and set error state (will be caught by error check on next run)
         if (ctx->data.waterPumpState == 1 &&
             ctx->data.waterFlowSwitch == 0 &&
             flowSwitchTooLongOff())
@@ -90,11 +119,7 @@ public:
             ctx->data.errorText = "Flowswitch still off when pump started";
             RealTimeClock::getFullDateTimeString(ctx->data.date, ctx->data.errorTimestamp);
         }
-
-        if (ctx->data.error)
-        {
-            ctx->data.waterPumpState = 0;
-        }
+        
         digitalWrite(WATERPUMP_PIN, ctx->data.waterPumpState);
     }
     
