@@ -47,19 +47,44 @@ public:
      */
     void run()
     {
-        values.add(PoolControlContext::instance()->data.redoxValue);
+        auto *ctx = PoolControlContext::instance();
+        
+        // Check for manual override first
+        if (ctx->data.chlorinePumpManualOverride)
+        {
+            // Check if manual override timeout has elapsed
+            if (ctx->data.chlorinePumpManualOverrideSince.year() != 0)
+            {
+                unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.chlorinePumpManualOverrideSince.unixtime());
+                if (elapsedSeconds >= ctx->config.pumpManualOverrideTimeoutSeconds)
+                {
+                    // Timeout reached - automatically return to auto mode
+                    ctx->data.chlorinePumpManualOverride = false;
+                }
+            }
+            
+            if (ctx->data.chlorinePumpManualOverride)
+            {
+                injectionPump.setManualState(ctx->data.chlorinePumpManualState);
+                ctx->data.redoxPumpState = injectionPump.isOn() ? 1 : 0;
+                return;
+            }
+            // If timeout occurred, fall through to automatic control
+        }
+        
+        // Automatic control based on time window
+        values.add(ctx->data.redoxValue);
         if (!values.isReady())
         {
             return;
         }
 
-        PoolControlContext::instance()->data.redoxValueMedian = values.get();
+        ctx->data.redoxValueMedian = values.get();
 
         // Chlorine injection is time-window based and distributed over water pump runtime
         // The InjectionPumpControl ensures it only runs when water pump is active
-        TimeOfDay now = PoolControlContext::instance()->data.date;
-        if (PoolControlContext::instance()->config.switchChlorOn < now && 
-            now < PoolControlContext::instance()->config.switchChlorOff)
+        TimeOfDay now = ctx->data.date;
+        if (ctx->config.switchChlorOn < now && now < ctx->config.switchChlorOff)
         {
             // Request injection - will only run if water pump is active
             // Max 45 minutes per day is enforced by InjectionPumpControl
@@ -73,12 +98,24 @@ public:
         // Update state for monitoring
         if (injectionPump.isOn())
         {
-            PoolControlContext::instance()->data.redoxPumpState = 1;
+            ctx->data.redoxPumpState = 1;
         }
         else
         {
-            PoolControlContext::instance()->data.redoxPumpState = 0;
+            ctx->data.redoxPumpState = 0;
         }
+    }
+    
+    /**
+     * @brief Set manual override state for chlorine pump
+     * @param override Enable manual override (true) or return to automatic (false)
+     * @param state Desired pump state when override is active (only used if override=true)
+     */
+    void setManualOverride(bool override, bool state = false)
+    {
+        auto *ctx = PoolControlContext::instance();
+        ctx->data.chlorinePumpManualOverride = override;
+        ctx->data.chlorinePumpManualState = state;
     }
 
 private:

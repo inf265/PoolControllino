@@ -1,0 +1,663 @@
+openapi: 3.0.3
+info:
+  title: Pool Controllino API
+  description: |
+    HTTP API for controlling a pool automation system including water pump,
+    pH injection pump, and chlorine injection pump.
+    
+    The controller manages pump schedules, sensor readings, and manual override
+    capabilities with automatic timeout functionality.
+  version: 1.0.0
+  contact:
+    name: Pool Controllino
+
+servers:
+  - url: http://pool-controllino.local
+    description: Default pool controller address (mDNS)
+
+paths:
+  /config:
+    get:
+      summary: Get configuration editor page
+      description: Returns an HTML page with a JSON editor interface to view and edit configuration
+      responses:
+        '200':
+          description: HTML page with configuration editor
+          content:
+            text/html:
+              schema:
+                type: string
+    
+    post:
+      summary: Update system configuration
+      description: |
+        Updates the system configuration. Configuration changes are persisted to EEPROM
+        and the controller will reboot after a successful update.
+        
+        Partial updates are supported - only provided parameters will be updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Configuration'
+            examples:
+              default:
+                value:
+                  updateTime: 3000
+                  switchOn: "07:00:00"
+                  switchOff: "19:00:00"
+                  phTargetValue: 7.4
+                  phTargetValueHysterese: 0.1
+                  phPumpCycleRunTime: 300
+                  phPumpCyclePauseTime: 300
+                  phPumpMaxRuntime: 1800
+                  chlorinePumpCycleRunTime: 600
+                  chlorinePumpCyclePauseTime: 3600
+                  chlorinePumpMaxRuntime: 2700
+                  redoxTargetValue: 465
+                  redoxTargetValueHysterese: 50
+                  switchChlorOn: "10:00:00"
+                  switchChlorOff: "17:00:00"
+                  waterPumpRuntimeBeforeInjection: 120
+                  waterPumpOffWhenFlowswitchOffTime: 30
+                  pumpManualOverrideTimeoutSeconds: 1800
+      responses:
+        '200':
+          description: Configuration updated successfully
+          headers:
+            Connection:
+              schema:
+                type: string
+                example: close
+
+  /data:
+    get:
+      summary: Get all system data
+      description: |
+        Returns all system data including sensor readings, pump states, manual override
+        status, and system status. The response is an HTML page with embedded JSON data.
+      responses:
+        '200':
+          description: System data
+          content:
+            text/html:
+              schema:
+                type: string
+                description: HTML page containing embedded JSON data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemData'
+
+  /pump/water/on:
+    get:
+      summary: Turn water pump ON manually
+      description: Activates manual override and turns the water pump ON
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+              example:
+                success: true
+                message: "Water pump manually turned ON"
+    
+    post:
+      summary: Turn water pump ON manually
+      description: Activates manual override and turns the water pump ON
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+              example:
+                success: true
+                message: "Water pump manually turned ON"
+
+  /pump/water/off:
+    get:
+      summary: Turn water pump OFF manually
+      description: Activates manual override and turns the water pump OFF
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Turn water pump OFF manually
+      description: Activates manual override and turns the water pump OFF
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+  /pump/water/auto:
+    get:
+      summary: Return water pump to automatic control
+      description: Deactivates manual override and returns water pump to automatic control
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Return water pump to automatic control
+      description: Deactivates manual override and returns water pump to automatic control
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+  /pump/ph/on:
+    get:
+      summary: Turn pH pump ON manually
+      description: Activates manual override and turns the pH pump ON
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Turn pH pump ON manually
+      description: Activates manual override and turns the pH pump ON
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+  /pump/ph/off:
+    get:
+      summary: Turn pH pump OFF manually
+      description: Activates manual override and turns the pH pump OFF
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Turn pH pump OFF manually
+      description: Activates manual override and turns the pH pump OFF
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+  /pump/ph/auto:
+    get:
+      summary: Return pH pump to automatic control
+      description: Deactivates manual override and returns pH pump to automatic control
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Return pH pump to automatic control
+      description: Deactivates manual override and returns pH pump to automatic control
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+  /pump/chlorine/on:
+    get:
+      summary: Turn chlorine pump ON manually
+      description: Activates manual override and turns the chlorine pump ON
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Turn chlorine pump ON manually
+      description: Activates manual override and turns the chlorine pump ON
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+  /pump/chlorine/off:
+    get:
+      summary: Turn chlorine pump OFF manually
+      description: Activates manual override and turns the chlorine pump OFF
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Turn chlorine pump OFF manually
+      description: Activates manual override and turns the chlorine pump OFF
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+  /pump/chlorine/auto:
+    get:
+      summary: Return chlorine pump to automatic control
+      description: Deactivates manual override and returns chlorine pump to automatic control
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+    
+    post:
+      summary: Return chlorine pump to automatic control
+      description: Deactivates manual override and returns chlorine pump to automatic control
+      tags:
+        - Pump Control
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PumpControlResponse'
+
+components:
+  schemas:
+    Configuration:
+      type: object
+      description: System configuration parameters
+      properties:
+        updateTime:
+          type: integer
+          format: int64
+          description: Main loop update interval in milliseconds
+          default: 3000
+        
+        # Water Pump Schedule
+        switchOn:
+          type: string
+          format: time
+          pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+          description: Time to turn on water pump in HH:MM:SS format
+          default: "07:00:00"
+          example: "07:00:00"
+        switchOff:
+          type: string
+          format: time
+          pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+          description: Time to turn off water pump in HH:MM:SS format
+          default: "19:00:00"
+          example: "19:00:00"
+        waterPumpRuntimeBeforeInjection:
+          type: integer
+          format: int64
+          description: Seconds to wait after water pump starts before allowing injection
+          default: 120
+        waterPumpOffWhenFlowswitchOffTime:
+          type: integer
+          format: int64
+          description: Seconds to wait after flow switch turns off before turning off water pump
+          default: 30
+        
+        # pH Pump Settings
+        phTargetValue:
+          type: number
+          format: float
+          description: Target pH value
+          default: 7.4
+        phTargetValueHysterese:
+          type: number
+          format: float
+          description: Hysteresis below target value to switch pump off
+          default: 0.1
+        phCalculationMValue:
+          type: number
+          format: float
+          description: Linear calibration slope for pH sensor
+          default: 0.00447761194
+        phCalculationCValue:
+          type: number
+          format: float
+          description: Linear calibration offset for pH sensor
+          default: -4.19403
+        phPumpCycleRunTime:
+          type: integer
+          format: int64
+          description: Seconds the pH pump runs per cycle
+          default: 300
+        phPumpCyclePauseTime:
+          type: integer
+          format: int64
+          description: Seconds the pH pump pauses between cycles
+          default: 300
+        phPumpMaxRuntime:
+          type: integer
+          format: int64
+          description: Maximum total runtime per day in seconds (default: 1800 = 30 minutes)
+          default: 1800
+        
+        # Chlorine Pump Settings
+        redoxTargetValue:
+          type: integer
+          format: int32
+          description: Target redox/ORP value in mV
+          default: 465
+        redoxTargetValueHysterese:
+          type: integer
+          format: int32
+          description: Hysteresis below target value to switch pump off
+          default: 50
+        redoxCalculationMValue:
+          type: number
+          format: float
+          description: Linear calibration slope for redox sensor
+          default: 0.97765363128
+        redoxCalculationCValue:
+          type: number
+          format: float
+          description: Linear calibration offset for redox sensor
+          default: -2154.888268
+        switchChlorOn:
+          type: string
+          format: time
+          pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+          description: Time to start chlorine injection window in HH:MM:SS format
+          default: "10:00:00"
+          example: "10:00:00"
+        switchChlorOff:
+          type: string
+          format: time
+          pattern: '^([0-1][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$'
+          description: Time to end chlorine injection window in HH:MM:SS format
+          default: "17:00:00"
+          example: "17:00:00"
+        chlorinePumpCycleRunTime:
+          type: integer
+          format: int64
+          description: Seconds the chlorine pump runs per cycle
+          default: 600
+        chlorinePumpCyclePauseTime:
+          type: integer
+          format: int64
+          description: Seconds the chlorine pump pauses between cycles
+          default: 3600
+        chlorinePumpMaxRuntime:
+          type: integer
+          format: int64
+          description: Maximum total runtime per day in seconds (default: 2700 = 45 minutes)
+          default: 2700
+        
+        # Manual Override Settings
+        pumpManualOverrideTimeoutSeconds:
+          type: integer
+          format: int64
+          description: Automatic timeout in seconds for manual pump control before returning to automatic mode (default: 1800 = 30 minutes)
+          default: 1800
+          minimum: 1
+          maximum: 86400
+      additionalProperties: false
+
+    SystemData:
+      type: object
+      description: Complete system data including sensor readings, pump states, and status
+      properties:
+        date:
+          type: string
+          description: Current date and time (DD.MM.YYYY HH:MM:SS format)
+          example: "08.10.2025 11:46:25"
+        temperature:
+          type: string
+          description: Water temperature in Celsius
+          example: "16.00"
+        housingtemperature:
+          type: string
+          description: Housing temperature in Celsius
+          example: "21.13"
+        ph:
+          type: string
+          description: Current pH value
+          example: "7.25"
+        phmedian:
+          type: string
+          description: Median pH value (smoothed)
+          example: "7.5"
+        redox:
+          type: string
+          description: Current redox/ORP value in mV
+          example: "835.75"
+        redoxmedian:
+          type: string
+          description: Median redox value (smoothed)
+          example: "835.75"
+        ph-pomp:
+          type: string
+          description: pH pump state (0 = off, 1 = on)
+          enum: ["0", "1"]
+          example: "0"
+        redox-pomp:
+          type: string
+          description: Chlorine pump state (0 = off, 1 = on)
+          enum: ["0", "1"]
+          example: "0"
+        water-pomp:
+          type: string
+          description: Water pump state (0 = off, 1 = on)
+          enum: ["0", "1"]
+          example: "1"
+        ph-man:
+          type: string
+          description: pH pump manual override flag (0 = automatic control, 1 = manual override active)
+          enum: ["0", "1"]
+          example: "0"
+        redox-man:
+          type: string
+          description: Chlorine pump manual override flag (0 = automatic control, 1 = manual override active)
+          enum: ["0", "1"]
+          example: "0"
+        water-man:
+          type: string
+          description: Water pump manual override flag (0 = automatic control, 1 = manual override active)
+          enum: ["0", "1"]
+          example: "0"
+        ph-man-rem:
+          type: string
+          description: Remaining seconds until pH pump automatically returns to auto mode (0 if not in manual override)
+          example: "0"
+        redox-man-rem:
+          type: string
+          description: Remaining seconds until chlorine pump automatically returns to auto mode (0 if not in manual override)
+          example: "0"
+        water-man-rem:
+          type: string
+          description: Remaining seconds until water pump automatically returns to auto mode (0 if not in manual override)
+          example: "0"
+        waterflowswitch:
+          type: string
+          description: Flow switch state (0 = no flow, 1 = flow detected)
+          enum: ["0", "1"]
+          example: "1"
+        powersupply:
+          type: string
+          description: Power supply state (0 = off, 1 = on)
+          enum: ["0", "1"]
+          example: "1"
+        clientip:
+          type: string
+          description: Controller IP address
+          example: ""
+        error:
+          type: string
+          description: Error flag (0 = no error, 1 = error present)
+          enum: ["0", "1"]
+          example: "0"
+        errortext:
+          type: string
+          description: Error message (if error present)
+          example: ""
+        errortimestamp:
+          type: string
+          description: Timestamp of error (if error present)
+          example: ""
+        warning:
+          type: string
+          description: Warning flag (0 = no warning, 1 = warning present)
+          enum: ["0", "1"]
+          example: "0"
+        warningtext:
+          type: string
+          description: Warning message (if warning present)
+          example: ""
+        warningtimestamp:
+          type: string
+          description: Timestamp of warning (if warning present)
+          example: ""
+        phadcvalue:
+          type: string
+          description: Raw ADC value for pH sensor
+          example: "2556"
+        redoxadcvalue:
+          type: string
+          description: Raw ADC value for redox sensor
+          example: "3059"
+        waterflowswitchadcvalue:
+          type: string
+          description: Raw ADC value for flow switch
+          example: "0"
+        powersupplyadcvalue:
+          type: string
+          description: Raw ADC value for power supply
+          example: "0"
+        uptime:
+          type: string
+          description: System uptime in seconds
+          example: "12345"
+      required:
+        - date
+        - temperature
+        - housingtemperature
+        - ph
+        - phmedian
+        - redox
+        - redoxmedian
+        - ph-pomp
+        - redox-pomp
+        - water-pomp
+        - ph-man
+        - redox-man
+        - water-man
+        - ph-man-rem
+        - redox-man-rem
+        - water-man-rem
+        - waterflowswitch
+        - powersupply
+        - clientip
+        - error
+        - errortext
+        - errortimestamp
+        - warning
+        - warningtext
+        - warningtimestamp
+        - phadcvalue
+        - redoxadcvalue
+        - waterflowswitchadcvalue
+        - powersupplyadcvalue
+        - uptime
+
+    PumpControlResponse:
+      type: object
+      description: Response from pump control endpoints
+      properties:
+        success:
+          type: boolean
+          description: Whether the operation was successful
+          example: true
+        message:
+          type: string
+          description: Human-readable message describing the result
+          example: "Water pump manually turned ON"
+      required:
+        - success
+        - message
+
+tags:
+  - name: Pump Control
+    description: Manual pump control endpoints for overriding automatic behavior
+

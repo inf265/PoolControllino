@@ -43,12 +43,38 @@ public:
      */
     void run()
     {
-        values.add(PoolControlContext::instance()->data.phValue);
+        auto *ctx = PoolControlContext::instance();
+        
+        // Check for manual override first
+        if (ctx->data.phPumpManualOverride)
+        {
+            // Check if manual override timeout has elapsed
+            if (ctx->data.phPumpManualOverrideSince.year() != 0)
+            {
+                unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.phPumpManualOverrideSince.unixtime());
+                if (elapsedSeconds >= ctx->config.pumpManualOverrideTimeoutSeconds)
+                {
+                    // Timeout reached - automatically return to auto mode
+                    ctx->data.phPumpManualOverride = false;
+                }
+            }
+            
+            if (ctx->data.phPumpManualOverride)
+            {
+                injectionPump.setManualState(ctx->data.phPumpManualState);
+                ctx->data.phPumpState = injectionPump.isOn() ? 1 : 0;
+                return;
+            }
+            // If timeout occurred, fall through to automatic control
+        }
+        
+        // Automatic control based on pH value
+        values.add(ctx->data.phValue);
         if (!values.isReady())
         {
             return;
         }
-        PoolControlContext::instance()->data.phValueMedian = values.get();
+        ctx->data.phValueMedian = values.get();
 
         float phValue = values.get();
 
@@ -58,14 +84,13 @@ public:
             injectionPump.off();
         }
         // pH is too high - need to inject acid to lower it
-        else if (phValue > PoolControlContext::instance()->config.phTargetValue)
+        else if (phValue > ctx->config.phTargetValue)
         {
             // Request injection - will only run if water pump is active
             injectionPump.on();
         }
         // pH is at or below target - hysteresis - stop injection
-        else if (phValue <= PoolControlContext::instance()->config.phTargetValue - 
-                 PoolControlContext::instance()->config.phTargetValueHysterese)
+        else if (phValue <= ctx->config.phTargetValue - ctx->config.phTargetValueHysterese)
         {
             injectionPump.off();
         }
@@ -78,12 +103,24 @@ public:
         // Update state for monitoring
         if (injectionPump.isOn())
         {
-            PoolControlContext::instance()->data.phPumpState = 1;
+            ctx->data.phPumpState = 1;
         }
         else
         {
-            PoolControlContext::instance()->data.phPumpState = 0;
+            ctx->data.phPumpState = 0;
         }
+    }
+    
+    /**
+     * @brief Set manual override state for pH pump
+     * @param override Enable manual override (true) or return to automatic (false)
+     * @param state Desired pump state when override is active (only used if override=true)
+     */
+    void setManualOverride(bool override, bool state = false)
+    {
+        auto *ctx = PoolControlContext::instance();
+        ctx->data.phPumpManualOverride = override;
+        ctx->data.phPumpManualState = state;
     }
 
 private:

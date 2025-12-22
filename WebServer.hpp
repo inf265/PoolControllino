@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include "Eeprom.hpp"
 #include "RealTimeClock.hpp"
+#include "PoolControlContext.hpp"
 #include <EthernetUdp.h>
 
 // EthernetUDP Udp;
@@ -43,7 +44,8 @@ namespace HC
     {
         NOSERVICE,
         EDITOR,
-        TOGGLE
+        TOGGLE,
+        PUMP_CONTROL
     };
 
     class WebServer
@@ -298,6 +300,138 @@ namespace HC
                 // }
             }
         }
+        
+        /**
+         * @brief Get current pump states as JSON
+         * @param client Ethernet client connection
+         */
+        void handlePumpStatusGet(EthernetClient client)
+        {
+            auto *ctx = PoolControlContext::instance();
+            
+            client.println(F("HTTP/1.1 200 OK"));
+            client.println(F("Content-Type: application/json"));
+            client.println(F("Connection: close"));
+            client.println();
+            client.print(F("{\"water\":{"));
+            client.print(F("\"state\":"));
+            client.print(ctx->data.waterPumpState ? F("1") : F("0"));
+            client.print(F(",\"manualOverride\":"));
+            client.print(ctx->data.waterPumpManualOverride ? F("true") : F("false"));
+            client.print(F("},\"ph\":{"));
+            client.print(F("\"state\":"));
+            client.print(ctx->data.phPumpState ? F("1") : F("0"));
+            client.print(F(",\"manualOverride\":"));
+            client.print(ctx->data.phPumpManualOverride ? F("true") : F("false"));
+            client.print(F("},\"chlorine\":{"));
+            client.print(F("\"state\":"));
+            client.print(ctx->data.redoxPumpState ? F("1") : F("0"));
+            client.print(F(",\"manualOverride\":"));
+            client.print(ctx->data.chlorinePumpManualOverride ? F("true") : F("false"));
+            client.println(F("}}"));
+            client.flush();
+        }
+        
+        /**
+         * @brief Handle pump control requests (manual override)
+         * @param client Ethernet client connection
+         * @param pumpType "water", "ph", or "chlorine"
+         * @param action "on", "off", or "auto" (to disable manual override)
+         */
+        void handlePumpControl(EthernetClient client, const char *pumpType, const char *action)
+        {
+            auto *ctx = PoolControlContext::instance();
+            bool success = false;
+            String response = "OK";
+            
+            if (strcmp(pumpType, "water") == 0)
+            {
+                if (strcmp(action, "on") == 0)
+                {
+                    ctx->data.waterPumpManualOverride = true;
+                    ctx->data.waterPumpManualState = true;
+                    ctx->data.waterPumpManualOverrideSince = ctx->data.date;
+                    success = true;
+                    response = "Water pump manually turned ON";
+                }
+                else if (strcmp(action, "off") == 0)
+                {
+                    ctx->data.waterPumpManualOverride = true;
+                    ctx->data.waterPumpManualState = false;
+                    ctx->data.waterPumpManualOverrideSince = ctx->data.date;
+                    success = true;
+                    response = "Water pump manually turned OFF";
+                }
+                else if (strcmp(action, "auto") == 0)
+                {
+                    ctx->data.waterPumpManualOverride = false;
+                    success = true;
+                    response = "Water pump returned to automatic control";
+                }
+            }
+            else if (strcmp(pumpType, "ph") == 0)
+            {
+                if (strcmp(action, "on") == 0)
+                {
+                    ctx->data.phPumpManualOverride = true;
+                    ctx->data.phPumpManualState = true;
+                    ctx->data.phPumpManualOverrideSince = ctx->data.date;
+                    success = true;
+                    response = "pH pump manually turned ON";
+                }
+                else if (strcmp(action, "off") == 0)
+                {
+                    ctx->data.phPumpManualOverride = true;
+                    ctx->data.phPumpManualState = false;
+                    ctx->data.phPumpManualOverrideSince = ctx->data.date;
+                    success = true;
+                    response = "pH pump manually turned OFF";
+                }
+                else if (strcmp(action, "auto") == 0)
+                {
+                    ctx->data.phPumpManualOverride = false;
+                    success = true;
+                    response = "pH pump returned to automatic control";
+                }
+            }
+            else if (strcmp(pumpType, "chlorine") == 0)
+            {
+                if (strcmp(action, "on") == 0)
+                {
+                    ctx->data.chlorinePumpManualOverride = true;
+                    ctx->data.chlorinePumpManualState = true;
+                    ctx->data.chlorinePumpManualOverrideSince = ctx->data.date;
+                    success = true;
+                    response = "Chlorine pump manually turned ON";
+                }
+                else if (strcmp(action, "off") == 0)
+                {
+                    ctx->data.chlorinePumpManualOverride = true;
+                    ctx->data.chlorinePumpManualState = false;
+                    ctx->data.chlorinePumpManualOverrideSince = ctx->data.date;
+                    success = true;
+                    response = "Chlorine pump manually turned OFF";
+                }
+                else if (strcmp(action, "auto") == 0)
+                {
+                    ctx->data.chlorinePumpManualOverride = false;
+                    success = true;
+                    response = "Chlorine pump returned to automatic control";
+                }
+            }
+            
+            // Send JSON response
+            client.println(F("HTTP/1.1 200 OK"));
+            client.println(F("Content-Type: application/json"));
+            client.println(F("Connection: close"));
+            client.println();
+            client.print(F("{\"success\":"));
+            client.print(success ? F("true") : F("false"));
+            client.print(F(",\"message\":\""));
+            client.print(response);
+            client.println(F("\"}"));
+            client.flush();
+        }
 
         void run()
         {
@@ -308,7 +442,7 @@ namespace HC
                 LOGN(F("new client"));
                 // an http request ends with a blank line
                 boolean currentLineIsBlank = true;
-                char tmpMem[64]{0};
+                char tmpMem[128]{0}; // Increased size for longer URIs like /pump/chlorine/on
                 int pBidx{0};
                 // String parseBuf;
                 ParseState s = ParseState::REQMETHOD;
@@ -349,7 +483,46 @@ namespace HC
                             {
                                 LOGN(F("Found Re-Line:"));
                                 LOG(tmpMem);
-                                if (strncmp(&tmpMem[pBidx - 7], "config ", 6) == 0)
+                                tmpMem[pBidx] = '\0'; // Null terminate the URI string
+                                
+                                // Check for pump status endpoint: GET /pump/status
+                                if (strcmp(tmpMem, "/pump/status") == 0)
+                                {
+                                    if (method == METHOD::GET)
+                                    {
+                                        handlePumpStatusGet(client);
+                                        client.stop();
+                                        client.clearWriteError();
+                                        LOGN(F("client disconnected"));
+                                        s = ParseState::RESTHEAD;
+                                        break;
+                                    }
+                                }
+                                // Check for pump control endpoints: /pump/{water|ph|chlorine}/{on|off|auto}
+                                else if (strncmp(tmpMem, "/pump/", 6) == 0)
+                                {
+                                    // Parse the URI: /pump/{type}/{action}
+                                    char *pumpType = tmpMem + 6; // Skip "/pump/"
+                                    char *slash2 = strchr(pumpType, '/');
+                                    if (slash2 != nullptr)
+                                    {
+                                        *slash2 = '\0'; // Terminate pump type
+                                        char *action = slash2 + 1;
+                                        
+                                        if (method == METHOD::POST || method == METHOD::GET)
+                                        {
+                                            handlePumpControl(client, pumpType, action);
+                                            client.stop();
+                                            client.clearWriteError();
+                                            LOGN(F("client disconnected"));
+                                            s = ParseState::RESTHEAD;
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // Check for existing endpoints (they check from end of string)
+                                if (pBidx >= 7 && strncmp(&tmpMem[pBidx - 7], "config ", 6) == 0)
                                 {
                                     if (method == METHOD::GET)
                                     {

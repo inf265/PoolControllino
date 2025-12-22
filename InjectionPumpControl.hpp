@@ -192,6 +192,33 @@ public:
     {
         return running;
     }
+    
+    /**
+     * @brief Set pump state manually (bypasses automatic control)
+     * @param state true to turn on, false to turn off
+     * 
+     * When called, the pump will be set to the requested state immediately,
+     * bypassing all safety checks and automatic control logic.
+     * Use with caution - this does NOT check water pump state or other prerequisites.
+     */
+    void setManualState(bool state)
+    {
+        if (state)
+        {
+            switchPump(HIGH);
+        }
+        else
+        {
+            switchPump(LOW);
+            // Reset state when manually turned off
+            if (running && runState == RunState::ON)
+            {
+                updateCurrentCycleRuntime();
+                totalPumpRuntime = totalPumpRuntime + currentCycleRuntime;
+            }
+            runState = RunState::OFF;
+        }
+    }
 
 private:
     uint8_t pumpPin;

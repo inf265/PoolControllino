@@ -15,6 +15,8 @@ namespace HC
     MDNS mdns(mDNSUdp);
 
     EthernetUDP Udp;
+    IPAddress multicastAddress(239, 255, 0, 1); // Local network multicast address
+    uint16_t multicastPort = 13000; // Same port as remote server
 
     char *IPAddress2String(IPAddress address, char *result)
     {
@@ -76,6 +78,8 @@ namespace HC
             {
                 char data[1024]{0};
                 LOGN(getSensorReadings(data, 1024));
+                
+                // Send version to remote server
                 if (!versionSent && strlen(PoolControlContext::instance()->data.clientIP) != 0)
                 {
                     Udp.beginPacket("89.163.135.79", 13000);
@@ -85,12 +89,23 @@ namespace HC
                     Udp.flush();
                     versionSent = true;
                 }
+                
+                // Send sensor data to remote server
                 if (!Udp.beginPacket("89.163.135.79", 13000))
-                    LOGN(F("begin failure"));
+                    LOGN(F("remote begin failure"));
                 if (!Udp.write((uint8_t *)data, strlen(data)))
-                    LOGN(F("write failure"));
+                    LOGN(F("remote write failure"));
                 Udp.endPacket();
                 Udp.flush();
+                
+                // Also send sensor data to local multicast address
+                if (!Udp.beginPacket(multicastAddress, multicastPort))
+                    LOGN(F("multicast begin failure"));
+                if (!Udp.write((uint8_t *)data, strlen(data)))
+                    LOGN(F("multicast write failure"));
+                Udp.endPacket();
+                Udp.flush();
+                
                 lastTime = millis();
             }
         }
@@ -110,6 +125,49 @@ namespace HC
             readings["ph-pomp"] = String(PoolControlContext::instance()->data.phPumpState);
             readings["redox-pomp"] = String(PoolControlContext::instance()->data.redoxPumpState);
             readings["water-pomp"] = String(PoolControlContext::instance()->data.waterPumpState);
+            readings["ph-man"] = String(PoolControlContext::instance()->data.phPumpManualOverride ? 1 : 0);
+            readings["redox-man"] = String(PoolControlContext::instance()->data.chlorinePumpManualOverride ? 1 : 0);
+            readings["water-man"] = String(PoolControlContext::instance()->data.waterPumpManualOverride ? 1 : 0);
+            
+            // Calculate remaining time until auto mode for each pump
+            unsigned long remainingSeconds = 0;
+            auto *ctx = PoolControlContext::instance();
+            
+            // Water pump remaining time
+            if (ctx->data.waterPumpManualOverride && ctx->data.waterPumpManualOverrideSince.year() != 0)
+            {
+                unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.waterPumpManualOverrideSince.unixtime());
+                if (elapsedSeconds < ctx->config.pumpManualOverrideTimeoutSeconds)
+                {
+                    remainingSeconds = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
+                }
+            }
+            readings["water-man-rem"] = String(remainingSeconds);
+            
+            // pH pump remaining time
+            remainingSeconds = 0;
+            if (ctx->data.phPumpManualOverride && ctx->data.phPumpManualOverrideSince.year() != 0)
+            {
+                unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.phPumpManualOverrideSince.unixtime());
+                if (elapsedSeconds < ctx->config.pumpManualOverrideTimeoutSeconds)
+                {
+                    remainingSeconds = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
+                }
+            }
+            readings["ph-man-rem"] = String(remainingSeconds);
+            
+            // Chlorine pump remaining time
+            remainingSeconds = 0;
+            if (ctx->data.chlorinePumpManualOverride && ctx->data.chlorinePumpManualOverrideSince.year() != 0)
+            {
+                unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.chlorinePumpManualOverrideSince.unixtime());
+                if (elapsedSeconds < ctx->config.pumpManualOverrideTimeoutSeconds)
+                {
+                    remainingSeconds = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
+                }
+            }
+            readings["redox-man-rem"] = String(remainingSeconds);
+            
             readings["waterflowswitch"] = String(PoolControlContext::instance()->data.waterFlowSwitch);
             readings["powersupply"] = String(PoolControlContext::instance()->data.powerSupply);
             readings["clientip"] = String(PoolControlContext::instance()->data.clientIP);

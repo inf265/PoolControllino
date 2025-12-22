@@ -35,6 +35,17 @@ public:
     bool warning{false};
     String warningText;
     char warningTimestamp[32]{0};
+    
+    // Manual override flags for pump control
+    bool waterPumpManualOverride{false};
+    bool waterPumpManualState{false};
+    DateTime waterPumpManualOverrideSince;
+    bool phPumpManualOverride{false};
+    bool phPumpManualState{false};
+    DateTime phPumpManualOverrideSince;
+    bool chlorinePumpManualOverride{false};
+    bool chlorinePumpManualState{false};
+    DateTime chlorinePumpManualOverrideSince;
 };
 
 class Configuration
@@ -51,7 +62,8 @@ public:
                       switchChlorOn(10, 0, 0),
                       switchChlorOff(17, 0, 0),
                       waterPumpRuntimeBeforeInjection(0, 0, 2, 0),
-                      waterPumpOffWhenFlowswitchOffTime(0, 0, 0, 30)
+                      waterPumpOffWhenFlowswitchOffTime(0, 0, 0, 30),
+                      pumpManualOverrideTimeoutSeconds(1800)
     {
     }
     unsigned long updateTime{3000};
@@ -75,6 +87,7 @@ public:
     TimeOfDay switchChlorOff;
     TimeSpan waterPumpRuntimeBeforeInjection;
     TimeSpan waterPumpOffWhenFlowswitchOffTime;
+    unsigned long pumpManualOverrideTimeoutSeconds{1800}; // Default: 30 minutes (1800 seconds)
     char switchConfigRaw[1024]{0};
 
     char *toJson(char *buffer, size_t size)
@@ -101,6 +114,7 @@ public:
         config["switchChlorOff"] = switchChlorOff.toString();
         config["waterPumpRuntimeBeforeInjection"] = waterPumpRuntimeBeforeInjection.totalseconds();
         config["waterPumpOffWhenFlowswitchOffTime"] = waterPumpOffWhenFlowswitchOffTime.totalseconds();
+        config["pumpManualOverrideTimeoutSeconds"] = pumpManualOverrideTimeoutSeconds;
 
         serializeJson(config, buffer, size);
         return buffer;
@@ -171,6 +185,11 @@ public:
         if (config.containsKey("waterPumpOffWhenFlowswitchOffTime"))
         {
             waterPumpOffWhenFlowswitchOffTime.setSeconds(config["waterPumpOffWhenFlowswitchOffTime"]);
+        }
+        
+        if (config.containsKey("pumpManualOverrideTimeoutSeconds"))
+        {
+            pumpManualOverrideTimeoutSeconds = config["pumpManualOverrideTimeoutSeconds"].as<unsigned long>();
         }
     }
 };
