@@ -110,6 +110,7 @@ public:
         
         // Flow switch safety check: if pump is on but flow switch is off for too long,
         // turn pump off and set error state (will be caught by error check on next run)
+        // The flowSwitchTooLongOff() function handles the case where waterPumpRunningSince is not initialized
         if (ctx->data.waterPumpState == 1 &&
             ctx->data.waterFlowSwitch == 0 &&
             flowSwitchTooLongOff())
@@ -138,8 +139,15 @@ public:
 private:
     bool flowSwitchTooLongOff()
     {
-        TimeSpan difftime = PoolControlContext::instance()->data.date - PoolControlContext::instance()->data.waterPumpRunningSince;
-        if (difftime.totalseconds() >= PoolControlContext::instance()->config.waterPumpOffWhenFlowswitchOffTime.totalseconds())
+        auto *ctx = PoolControlContext::instance();
+        // Safety check: if timestamp is not initialized, don't consider flow switch as too long off
+        // This allows the pump to start even if the flow switch is initially off
+        if (ctx->data.waterPumpRunningSince.year() == 0)
+        {
+            return false;
+        }
+        TimeSpan difftime = ctx->data.date - ctx->data.waterPumpRunningSince;
+        if (difftime.totalseconds() >= ctx->config.waterPumpOffWhenFlowswitchOffTime.totalseconds())
         {
             return true;
         }

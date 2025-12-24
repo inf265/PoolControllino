@@ -112,79 +112,113 @@ namespace HC
 
         static char *getSensorReadings(char *buffer, size_t size)
         {
-            JsonDocument readings;
+            // Build JSON string manually to avoid heap allocations (more memory-efficient for embedded systems)
+            auto *ctx = PoolControlContext::instance();
             char date[20]{0};
-            RealTimeClock::getFullDateTimeString(PoolControlContext::instance()->data.date, date);
-            readings["date"] = String(date);
-            readings["temperature"] = String(PoolControlContext::instance()->data.waterTemperature);
-            readings["housingtemperature"] = String(PoolControlContext::instance()->data.housingTemperature);
-            readings["ph"] = String(PoolControlContext::instance()->data.phValue);
-            readings["phmedian"] = String(PoolControlContext::instance()->data.phValueMedian);
-            readings["redox"] = String(PoolControlContext::instance()->data.redoxValue);
-            readings["redoxmedian"] = String(PoolControlContext::instance()->data.redoxValueMedian);
-            readings["ph-pomp"] = String(PoolControlContext::instance()->data.phPumpState);
-            readings["redox-pomp"] = String(PoolControlContext::instance()->data.redoxPumpState);
-            readings["water-pomp"] = String(PoolControlContext::instance()->data.waterPumpState);
-            readings["ph-man"] = String(PoolControlContext::instance()->data.phPumpManualOverride ? 1 : 0);
-            readings["redox-man"] = String(PoolControlContext::instance()->data.chlorinePumpManualOverride ? 1 : 0);
-            readings["water-man"] = String(PoolControlContext::instance()->data.waterPumpManualOverride ? 1 : 0);
+            RealTimeClock::getFullDateTimeString(ctx->data.date, date);
             
             // Calculate remaining time until auto mode for each pump
-            unsigned long remainingSeconds = 0;
-            auto *ctx = PoolControlContext::instance();
-            
-            // Water pump remaining time
+            unsigned long waterRem = 0;
             if (ctx->data.waterPumpManualOverride && ctx->data.waterPumpManualOverrideSince.year() != 0)
             {
                 unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.waterPumpManualOverrideSince.unixtime());
                 if (elapsedSeconds < ctx->config.pumpManualOverrideTimeoutSeconds)
                 {
-                    remainingSeconds = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
+                    waterRem = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
                 }
             }
-            readings["water-man-rem"] = String(remainingSeconds);
             
-            // pH pump remaining time
-            remainingSeconds = 0;
+            unsigned long phRem = 0;
             if (ctx->data.phPumpManualOverride && ctx->data.phPumpManualOverrideSince.year() != 0)
             {
                 unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.phPumpManualOverrideSince.unixtime());
                 if (elapsedSeconds < ctx->config.pumpManualOverrideTimeoutSeconds)
                 {
-                    remainingSeconds = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
+                    phRem = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
                 }
             }
-            readings["ph-man-rem"] = String(remainingSeconds);
             
-            // Chlorine pump remaining time
-            remainingSeconds = 0;
+            unsigned long redoxRem = 0;
             if (ctx->data.chlorinePumpManualOverride && ctx->data.chlorinePumpManualOverrideSince.year() != 0)
             {
                 unsigned long elapsedSeconds = (ctx->data.date.unixtime() - ctx->data.chlorinePumpManualOverrideSince.unixtime());
                 if (elapsedSeconds < ctx->config.pumpManualOverrideTimeoutSeconds)
                 {
-                    remainingSeconds = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
+                    redoxRem = ctx->config.pumpManualOverrideTimeoutSeconds - elapsedSeconds;
                 }
             }
-            readings["redox-man-rem"] = String(remainingSeconds);
             
-            readings["waterflowswitch"] = String(PoolControlContext::instance()->data.waterFlowSwitch);
-            readings["powersupply"] = String(PoolControlContext::instance()->data.powerSupply);
-            readings["clientip"] = String(PoolControlContext::instance()->data.clientIP);
-            readings["error"] = String(PoolControlContext::instance()->data.error);
-            readings["errortext"] = PoolControlContext::instance()->data.errorText;
-            readings["errortimestamp"] = String(PoolControlContext::instance()->data.errorTimestamp);
-            readings["warning"] = String(PoolControlContext::instance()->data.warning);
-            readings["warningtext"] = PoolControlContext::instance()->data.warningText;
-            readings["warningtimestamp"] = String(PoolControlContext::instance()->data.warningTimestamp);
-            readings["phadcvalue"] = String(PoolControlContext::instance()->data.phAdcValue);
-            readings["redoxadcvalue"] = String(PoolControlContext::instance()->data.redoxAdcValue);
-            readings["waterflowswitchadcvalue"] = String(PoolControlContext::instance()->data.waterflowSwitchAdcValue);
-            readings["powersupplyadcvalue"] = String(PoolControlContext::instance()->data.powerSupplyAdcValue);
-            readings["uptime"] = String(PoolControlContext::instance()->data.uptimeSeconds);
-
-            // String jsonString;
-            serializeJson(readings, buffer, size);
+            // Build JSON string manually using dtostrf for floats (AVR doesn't support %f in snprintf)
+            char tempFloat[10];
+            int len = 0;
+            
+            // Start JSON object
+            len += snprintf(buffer + len, size - len, "{\"date\":\"%s\",", date);
+            
+            // Float values using dtostrf
+            dtostrf(ctx->data.waterTemperature, 0, 2, tempFloat);
+            len += snprintf(buffer + len, size - len, "\"temperature\":%s,", tempFloat);
+            
+            dtostrf(ctx->data.housingTemperature, 0, 2, tempFloat);
+            len += snprintf(buffer + len, size - len, "\"housingtemperature\":%s,", tempFloat);
+            
+            dtostrf(ctx->data.phValue, 0, 2, tempFloat);
+            len += snprintf(buffer + len, size - len, "\"ph\":%s,", tempFloat);
+            
+            dtostrf(ctx->data.phValueMedian, 0, 2, tempFloat);
+            len += snprintf(buffer + len, size - len, "\"phmedian\":%s,", tempFloat);
+            
+            dtostrf(ctx->data.redoxValue, 0, 2, tempFloat);
+            len += snprintf(buffer + len, size - len, "\"redox\":%s,", tempFloat);
+            
+            dtostrf(ctx->data.redoxValueMedian, 0, 2, tempFloat);
+            len += snprintf(buffer + len, size - len, "\"redoxmedian\":%s,", tempFloat);
+            
+            // Integer and boolean values
+            len += snprintf(buffer + len, size - len,
+                "\"ph-pomp\":%d,\"redox-pomp\":%d,\"water-pomp\":%d,"
+                "\"ph-man\":%d,\"redox-man\":%d,\"water-man\":%d,"
+                "\"ph-man-rem\":%lu,\"redox-man-rem\":%lu,\"water-man-rem\":%lu,"
+                "\"waterflowswitch\":%d,\"powersupply\":%d,"
+                "\"clientip\":\"%s\",\"error\":%d,\"errortext\":\"%s\","
+                "\"errortimestamp\":\"%s\",\"warning\":%d,\"warningtext\":\"%s\","
+                "\"warningtimestamp\":\"%s\",\"phadcvalue\":%lu,\"redoxadcvalue\":%lu,"
+                "\"waterflowswitchadcvalue\":%lu,\"powersupplyadcvalue\":%lu,\"uptime\":%lu}",
+                ctx->data.phPumpState ? 1 : 0,
+                ctx->data.redoxPumpState ? 1 : 0,
+                ctx->data.waterPumpState ? 1 : 0,
+                ctx->data.phPumpManualOverride ? 1 : 0,
+                ctx->data.chlorinePumpManualOverride ? 1 : 0,
+                ctx->data.waterPumpManualOverride ? 1 : 0,
+                phRem,
+                redoxRem,
+                waterRem,
+                ctx->data.waterFlowSwitch ? 1 : 0,
+                ctx->data.powerSupply ? 1 : 0,
+                ctx->data.clientIP,
+                ctx->data.error ? 1 : 0,
+                ctx->data.errorText.c_str(),
+                ctx->data.errorTimestamp,
+                ctx->data.warning ? 1 : 0,
+                ctx->data.warningText.c_str(),
+                ctx->data.warningTimestamp,
+                ctx->data.phAdcValue,
+                ctx->data.redoxAdcValue,
+                ctx->data.waterflowSwitchAdcValue,
+                ctx->data.powerSupplyAdcValue,
+                ctx->data.uptimeSeconds
+            );
+            
+            // Ensure null termination
+            if (len < 0 || (size_t)len >= size)
+            {
+                buffer[size - 1] = '\0';
+            }
+            else
+            {
+                buffer[len] = '\0';
+            }
+            
             return buffer;
         }
 

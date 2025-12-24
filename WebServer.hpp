@@ -192,22 +192,21 @@ namespace HC
             client.println(Ethernet.localIP());
             client.println(F("/editor\">Switch to IP if you're on DNS name</a><br/>"));
             client.println(F("<table></table>"));
-            client.println(F("</body></html>"));
-            client.println(F("<script>"));
-            client.print(F("let json = '"));
+            client.println(F("<script id=\"json-data\" type=\"application/json\">"));
             memset(memory, 0, 1024);
             Networking::getSensorReadings(memory, 1024);
             client.print(memory);
-            client.println(F("'"));
-            client.println(F("var data = JSON.parse(json);"));
+            client.println(F("</script>"));
+            client.println(F("<script>"));
+            client.println(F("var jsonElement = document.getElementById('json-data');"));
+            client.println(F("var data = JSON.parse(jsonElement.textContent);"));
             client.println(F("var table = document.querySelector('table');"));
             client.println(F("var rows = '';"));
             client.println(F("for (var p in data) {"));
             client.println(F("rows += '<tr><td>' + p + '</td><td>' + data[p] + '</td></tr>' }"));
             client.println(F("table.innerHTML = rows;"));
             client.println(F("</script>"));
-            client.println(F("</body>"));
-            client.println(F("</html>"));
+            client.println(F("</body></html>"));
             client.flush();
         }
 
@@ -277,18 +276,38 @@ namespace HC
             LOGN(tmpMem);
             if (service == SERVICE::EDITOR)
             {
-                JsonDocument tmp;
-                DeserializationError err = deserializeJson(tmp, (const char *)tmpMem);
-                LOGN(err.c_str());
-                if (err == DeserializationError::Ok)
+                // Simple JSON validation without full deserialization (saves memory)
+                // Check basic structure: starts with {, ends with }, braces match, size fits
+                size_t jsonLen = strlen(tmpMem);
+                if (jsonLen > 0 && jsonLen < 1024 && tmpMem[0] == '{' && tmpMem[jsonLen - 1] == '}')
                 {
-                    LOGN(F("Writing config."));
-                    eeprom->writeConfig(tmpMem, strlen(tmpMem));
-                    doReboot = true;
+                    // Count braces to ensure they match
+                    int braceCount = 0;
+                    bool valid = true;
+                    for (size_t i = 0; i < jsonLen; ++i)
+                    {
+                        if (tmpMem[i] == '{') braceCount++;
+                        else if (tmpMem[i] == '}') braceCount--;
+                        if (braceCount < 0)
+                        {
+                            valid = false;
+                            break;
+                        }
+                    }
+                    if (valid && braceCount == 0)
+                    {
+                        LOGN(F("Writing config."));
+                        eeprom->writeConfig(tmpMem, jsonLen);
+                        doReboot = true;
+                    }
+                    else
+                    {
+                        LOGN(F("Invalid JSON structure: braces don't match"));
+                    }
                 }
                 else
                 {
-                    LOGN(F("Cannot deserialize data"));
+                    LOGN(F("Invalid JSON: must start with {, end with }, and be < 1024 bytes"));
                 }
             }
             if (service == SERVICE::TOGGLE)
@@ -342,7 +361,12 @@ namespace HC
         {
             auto *ctx = PoolControlContext::instance();
             bool success = false;
-            String response = "OK";
+            String response = "Invalid pump type or action";
+            
+            LOG(F("handlePumpControl: pumpType="));
+            LOG(pumpType);
+            LOG(F(", action="));
+            LOGN(action);
             
             if (strcmp(pumpType, "water") == 0)
             {
@@ -403,6 +427,7 @@ namespace HC
                     ctx->data.chlorinePumpManualOverrideSince = ctx->data.date;
                     success = true;
                     response = "Chlorine pump manually turned ON";
+                    LOGN(F("Chlorine pump manual override ON"));
                 }
                 else if (strcmp(action, "off") == 0)
                 {
@@ -411,13 +436,27 @@ namespace HC
                     ctx->data.chlorinePumpManualOverrideSince = ctx->data.date;
                     success = true;
                     response = "Chlorine pump manually turned OFF";
+                    LOGN(F("Chlorine pump manual override OFF"));
                 }
                 else if (strcmp(action, "auto") == 0)
                 {
                     ctx->data.chlorinePumpManualOverride = false;
                     success = true;
                     response = "Chlorine pump returned to automatic control";
+                    LOGN(F("Chlorine pump manual override AUTO"));
                 }
+                else
+                {
+                    response = "Invalid action for chlorine pump (must be on/off/auto)";
+                    LOG(F("Invalid action: "));
+                    LOGN(action);
+                }
+            }
+            else
+            {
+                response = "Invalid pump type (must be water/ph/chlorine)";
+                LOG(F("Invalid pumpType: "));
+                LOGN(pumpType);
             }
             
             // Send JSON response
@@ -509,6 +548,20 @@ namespace HC
                                         *slash2 = '\0'; // Terminate pump type
                                         char *action = slash2 + 1;
                                         
+                                        // Remove any trailing characters (like ?query, /, or HTTP version)
+                                        char *spaceOrQuestion = strchr(action, ' ');
+                                        if (spaceOrQuestion == nullptr)
+                                            spaceOrQuestion = strchr(action, '?');
+                                        if (spaceOrQuestion == nullptr)
+                                            spaceOrQuestion = strchr(action, '/');
+                                        if (spaceOrQuestion != nullptr)
+                                            *spaceOrQuestion = '\0';
+                                        
+                                        LOG(F("Parsed pump control: type="));
+                                        LOG(pumpType);
+                                        LOG(F(", action="));
+                                        LOGN(action);
+                                        
                                         if (method == METHOD::POST || method == METHOD::GET)
                                         {
                                             handlePumpControl(client, pumpType, action);
@@ -518,6 +571,10 @@ namespace HC
                                             s = ParseState::RESTHEAD;
                                             break;
                                         }
+                                    }
+                                    else
+                                    {
+                                        LOGN(F("Pump control URI missing action (no second slash)"));
                                     }
                                 }
                                 
