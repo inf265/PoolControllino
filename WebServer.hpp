@@ -157,7 +157,7 @@ namespace HC
             bool endDetection{false};
             char buf[4]{0};
             char *pBuf = buf;
-            char memory[1024]{0};
+            char memory[768]{0};
             while (!end)
             {
                 char c = client.read();
@@ -193,8 +193,8 @@ namespace HC
             client.println(F("/editor\">Switch to IP if you're on DNS name</a><br/>"));
             client.println(F("<table></table>"));
             client.println(F("<script id=\"json-data\" type=\"application/json\">"));
-            memset(memory, 0, 1024);
-            Networking::getSensorReadings(memory, 1024);
+            memset(memory, 0, 768);
+            Networking::getSensorReadings(memory, 768);
             client.print(memory);
             client.println(F("</script>"));
             client.println(F("<script>"));
@@ -279,7 +279,7 @@ namespace HC
                 // Simple JSON validation without full deserialization (saves memory)
                 // Check basic structure: starts with {, ends with }, braces match, size fits
                 size_t jsonLen = strlen(tmpMem);
-                if (jsonLen > 0 && jsonLen < 1024 && tmpMem[0] == '{' && tmpMem[jsonLen - 1] == '}')
+                if (jsonLen > 0 && jsonLen < 768 && tmpMem[0] == '{' && tmpMem[jsonLen - 1] == '}')
                 {
                     // Count braces to ensure they match
                     int braceCount = 0;
@@ -307,7 +307,7 @@ namespace HC
                 }
                 else
                 {
-                    LOGN(F("Invalid JSON: must start with {, end with }, and be < 1024 bytes"));
+                    LOGN(F("Invalid JSON: must start with {, end with }, and be < 768 bytes"));
                 }
             }
             if (service == SERVICE::TOGGLE)

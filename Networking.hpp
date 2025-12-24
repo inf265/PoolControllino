@@ -76,8 +76,8 @@ namespace HC
             }
             if ((millis() - lastTime) > PoolControlContext::instance()->config.updateTime)
             {
-                char data[1024]{0};
-                LOGN(getSensorReadings(data, 1024));
+                char data[768]{0};
+                LOGN(getSensorReadings(data, 768));
                 
                 // Send version to remote server
                 if (!versionSent && strlen(PoolControlContext::instance()->data.clientIP) != 0)
@@ -197,10 +197,10 @@ namespace HC
                 ctx->data.powerSupply ? 1 : 0,
                 ctx->data.clientIP,
                 ctx->data.error ? 1 : 0,
-                ctx->data.errorText.c_str(),
+                ctx->data.errorText,
                 ctx->data.errorTimestamp,
                 ctx->data.warning ? 1 : 0,
-                ctx->data.warningText.c_str(),
+                ctx->data.warningText,
                 ctx->data.warningTimestamp,
                 ctx->data.phAdcValue,
                 ctx->data.redoxAdcValue,

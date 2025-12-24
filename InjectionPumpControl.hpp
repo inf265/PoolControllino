@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <string.h>
 
 enum class RunState : uint8_t
 {
@@ -270,7 +271,8 @@ private:
         if (actualTotalRuntime.totalseconds() >= pumpMaxRuntime.totalseconds())
         {
             PoolControlContext::instance()->data.warning = true;
-            PoolControlContext::instance()->data.warningText = "Max injection time exceeded.";
+            strncpy(PoolControlContext::instance()->data.warningText, "Max injection time exceeded.", sizeof(PoolControlContext::instance()->data.warningText) - 1);
+            PoolControlContext::instance()->data.warningText[sizeof(PoolControlContext::instance()->data.warningText) - 1] = '\0';
             RealTimeClock::getFullDateTimeString(PoolControlContext::instance()->data.date, PoolControlContext::instance()->data.warningTimestamp);
             return true;
         }

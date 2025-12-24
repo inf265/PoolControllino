@@ -30,10 +30,10 @@ public:
     DateTime waterPumpRunningSince;
     unsigned long uptimeSeconds = 0; // Track controller uptime in seconds
     bool error{false};
-    String errorText;
+    char errorText[128]{0};
     char errorTimestamp[32]{0};
     bool warning{false};
-    String warningText;
+    char warningText[128]{0};
     char warningTimestamp[32]{0};
     
     // Manual override flags for pump control
@@ -88,7 +88,7 @@ public:
     TimeSpan waterPumpRuntimeBeforeInjection;
     TimeSpan waterPumpOffWhenFlowswitchOffTime;
     unsigned long pumpManualOverrideTimeoutSeconds{1800}; // Default: 30 minutes (1800 seconds)
-    char switchConfigRaw[1024]{0};
+    char switchConfigRaw[768]{0};
 
     char *toJson(char *buffer, size_t size)
     {

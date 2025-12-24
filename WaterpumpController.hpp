@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Arduino.h>
+#include <string.h>
 #include <Controllino.h>
 #include "PoolControl_Config.h"
 #include "PoolControlContext.hpp"
@@ -117,7 +118,8 @@ public:
         {
             ctx->data.waterPumpState = 0;
             ctx->data.error = true;
-            ctx->data.errorText = "Flowswitch still off when pump started";
+            strncpy(ctx->data.errorText, "Flowswitch still off when pump started", sizeof(ctx->data.errorText) - 1);
+            ctx->data.errorText[sizeof(ctx->data.errorText) - 1] = '\0';
             RealTimeClock::getFullDateTimeString(ctx->data.date, ctx->data.errorTimestamp);
         }
         

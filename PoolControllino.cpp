@@ -52,7 +52,7 @@ void setup()
 
     webserver.setup(&eeprom);
 
-    if (!eeprom.readConfig(PoolControlContext::instance()->config.switchConfigRaw, 1024))
+    if (!eeprom.readConfig(PoolControlContext::instance()->config.switchConfigRaw, 768))
     {
         LOGN(F("Read Config"));
         // if (deserializeJson(inputHandlerSwitches.switchConfig, (const char *)switchConfigRaw) != DeserializationError::Ok)
@@ -64,7 +64,7 @@ void setup()
     {
 
         LOG(F("No Config present. Writing initial config with defaults, len:"));
-        PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 1024);
+        PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 768);
         eeprom.writeConfig(PoolControlContext::instance()->config.switchConfigRaw, strlen(PoolControlContext::instance()->config.switchConfigRaw));
     }
     JsonDocument jsonTmp;
