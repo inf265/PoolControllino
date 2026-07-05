@@ -551,7 +551,11 @@ namespace HC
                                 tmpMem[pBidx] = '\0'; // Null terminate the URI string
 
                                 // Firmware version endpoint: GET /version
-                                if (strcmp(tmpMem, "/version") == 0)
+                                // NB: tmpMem still carries the trailing space from the
+                                // request line ("/version "), so match a boundary rather
+                                // than using strcmp against the bare path.
+                                if (strncmp(tmpMem, "/version", 8) == 0 &&
+                                    (tmpMem[8] == ' ' || tmpMem[8] == '\0'))
                                 {
                                     if (method == METHOD::GET)
                                     {
@@ -564,7 +568,11 @@ namespace HC
                                     }
                                 }
                                 // Check for pump status endpoint: GET /pump/status
-                                if (strcmp(tmpMem, "/pump/status") == 0)
+                                // NB: tmpMem still carries the trailing space from the
+                                // request line ("/pump/status "), so match a boundary
+                                // rather than using strcmp against the bare path.
+                                if (strncmp(tmpMem, "/pump/status", 12) == 0 &&
+                                    (tmpMem[12] == ' ' || tmpMem[12] == '\0'))
                                 {
                                     if (method == METHOD::GET)
                                     {
