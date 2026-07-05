@@ -37,19 +37,7 @@ target_link_libraries(PoolControllino PUBLIC ACEBUTTON)
 target_link_libraries(PoolControllino PUBLIC OneWire)
 target_link_libraries(PoolControllino PUBLIC DallasTemperature)
 
-# Regenerate the git version header on every build (script mode), so the
-# embedded version always matches the firmware being flashed. Exposed at
-# runtime via GET /version and in the version.h gitVersion string.
-set(GENERATED_DIR ${CMAKE_BINARY_DIR}/generated)
-add_custom_target(generate_version_header ALL
-    COMMAND ${CMAKE_COMMAND}
-        -DSRC_DIR=${CMAKE_SOURCE_DIR}
-        -DOUT_FILE=${GENERATED_DIR}/version_git.h
-        -P ${CMAKE_SOURCE_DIR}/cmake/git_version.cmake
-    BYPRODUCTS ${GENERATED_DIR}/version_git.h
-    COMMENT "Generating git version header")
-add_dependencies(PoolControllino generate_version_header)
-target_include_directories(PoolControllino PUBLIC ${GENERATED_DIR})
+execute_process(COMMAND git describe --abbrev=4 --dirty --always --tags OUTPUT_VARIABLE GITVERSION OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_STRIP_TRAILING_WHITESPACE)
 
 target_compile_options(PoolControllino PUBLIC
     "-Wall"
@@ -58,6 +46,7 @@ target_compile_options(PoolControllino PUBLIC
     "-felide-constructors"
     "-std=c++0x"
     "-DCONTROLLINO_MEGA"
+    -DGITVERSION=${GITVERSION}
 )
 arduino_avr_hex(PoolControllino)
 

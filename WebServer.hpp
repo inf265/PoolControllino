@@ -5,7 +5,6 @@
 #include "Eeprom.hpp"
 #include "RealTimeClock.hpp"
 #include "PoolControlContext.hpp"
-#include "version.h"
 #include <EthernetUdp.h>
 
 // EthernetUDP Udp;
@@ -334,22 +333,6 @@ namespace HC
          * @brief Get current pump states as JSON
          * @param client Ethernet client connection
          */
-        /**
-         * @brief Report the firmware git version so a running device can be
-         *        matched against the source it was built from.
-         */
-        void handleVersionGet(EthernetClient client)
-        {
-            client.println(F("HTTP/1.1 200 OK"));
-            client.println(F("Content-Type: application/json"));
-            client.println(F("Connection: close"));
-            client.println();
-            client.print(F("{\"version\":\""));
-            client.print(gitVersion);
-            client.println(F("\"}"));
-            client.flush();
-        }
-
         void handlePumpStatusGet(EthernetClient client)
         {
             auto *ctx = PoolControlContext::instance();
@@ -550,19 +533,6 @@ namespace HC
                                 LOG(tmpMem);
                                 tmpMem[pBidx] = '\0'; // Null terminate the URI string
 
-                                // Firmware version endpoint: GET /version
-                                if (strcmp(tmpMem, "/version") == 0)
-                                {
-                                    if (method == METHOD::GET)
-                                    {
-                                        handleVersionGet(client);
-                                        client.stop();
-                                        client.clearWriteError();
-                                        LOGN(F("client disconnected"));
-                                        s = ParseState::RESTHEAD;
-                                        break;
-                                    }
-                                }
                                 // Check for pump status endpoint: GET /pump/status
                                 if (strcmp(tmpMem, "/pump/status") == 0)
                                 {
