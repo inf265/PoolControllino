@@ -210,7 +210,9 @@ namespace HC
             client.flush();
         }
 
-#define TMPMEM_SIZE 650
+// Must be large enough to hold the full config JSON POSTed to /config.
+// switchConfigRaw is 768 bytes, so keep this comfortably above it.
+#define TMPMEM_SIZE 800
 
         void handlePost(EthernetClient client, SERVICE service)
         {
@@ -224,8 +226,15 @@ namespace HC
             while (!end)
             {
                 char c = client.read();
-                tmpMem[pBidx] = c;
-                ++pBidx;
+                // Guard against overflow: keep one byte for the null terminator.
+                // Excess bytes are still drained from the socket (length keeps
+                // counting down) but not stored, so an oversized body fails
+                // validation cleanly instead of corrupting the stack.
+                if (pBidx < TMPMEM_SIZE - 1)
+                {
+                    tmpMem[pBidx] = c;
+                    ++pBidx;
+                }
                 switch (ps)
                 {
                 case ParseState::HEADLINE:
