@@ -43,6 +43,31 @@ void setup()
     serial.setup();
     eeprom.setup();
     realTimeClock.init();
+
+    // Load configuration from EEPROM BEFORE networking, so the static IP
+    // (Configuration::ipAddress, editable via <IP>/config, default 192.168.42.220)
+    // is available when Ethernet is brought up.
+    if (!eeprom.readConfig(PoolControlContext::instance()->config.switchConfigRaw, 768))
+    {
+        LOGN(F("Read Config"));
+    }
+    else
+    {
+        LOG(F("No Config present. Writing initial config with defaults, len:"));
+        PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 768);
+        eeprom.writeConfig(PoolControlContext::instance()->config.switchConfigRaw, strlen(PoolControlContext::instance()->config.switchConfigRaw));
+    }
+    {
+        JsonDocument jsonTmp;
+        deserializeJson(jsonTmp, PoolControlContext::instance()->config.switchConfigRaw);
+        PoolControlContext::instance()->config.fromJson(jsonTmp);
+    }
+    // Re-serialize so the /config editor always reflects the full current
+    // configuration, including fields (like ipAddress) that a stored config
+    // predating them may not yet contain.
+    PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 768);
+    LOGN(PoolControlContext::instance()->config.switchConfigRaw);
+
     networking.setup(eeprom.macAddress);
     temperatureSensors.init();
     adcController.init();
@@ -52,25 +77,6 @@ void setup()
 
     webserver.setup(&eeprom);
 
-    if (!eeprom.readConfig(PoolControlContext::instance()->config.switchConfigRaw, 768))
-    {
-        LOGN(F("Read Config"));
-        // if (deserializeJson(inputHandlerSwitches.switchConfig, (const char *)switchConfigRaw) != DeserializationError::Ok)
-        // {
-        //     eeprom.eraseConfig();
-        // }
-    }
-    else
-    {
-
-        LOG(F("No Config present. Writing initial config with defaults, len:"));
-        PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 768);
-        eeprom.writeConfig(PoolControlContext::instance()->config.switchConfigRaw, strlen(PoolControlContext::instance()->config.switchConfigRaw));
-    }
-    JsonDocument jsonTmp;
-    deserializeJson(jsonTmp, PoolControlContext::instance()->config.switchConfigRaw);
-    PoolControlContext::instance()->config.fromJson(jsonTmp);
-    LOGN(PoolControlContext::instance()->config.switchConfigRaw);
     snprintf(myId, 9, "%02x-%02x-%02x", eeprom.macAddress[3], eeprom.macAddress[4], eeprom.macAddress[5]);
     pinMode(CONTROLLINO_D23, OUTPUT);    // heartbeat blinking
     pinMode(CONTROLLINO_D17, OUTPUT);    // for reset

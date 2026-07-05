@@ -2,7 +2,7 @@
 
 #include <Ethernet.h>
 #include <EthernetUdp.h>
-#include <ArduinoMDNS.h>
+#include "MdnsResponder.hpp"
 #include "Identification.hpp"
 #include "PoolControlContext.hpp"
 #include "version.h"
@@ -11,8 +11,9 @@
 namespace HC
 {
 
-    EthernetUDP mDNSUdp;
-    MDNS mdns(mDNSUdp);
+    // Minimal, zero-heap mDNS responder (replaces ArduinoMDNS which caused
+    // memory problems). Answers A queries for "<mdnsName>.local".
+    MdnsResponder mdns;
 
     EthernetUDP Udp;
     IPAddress multicastAddress(239, 255, 0, 1); // Local network multicast address
@@ -38,24 +39,21 @@ namespace HC
     public:
         void setup(uint8_t *mac)
         {
-            // Start up networking
-            String ipaddress = "192.168.100.240";
+            // Static IP comes from the configuration (editable via <IP>/config),
+            // defaulting to 192.168.42.220 (see Configuration::ipAddress).
             IPAddress ipa;
-            ipa.fromString(ipaddress);
+            ipa.fromString(PoolControlContext::instance()->config.ipAddress);
             Ethernet.begin(mac, ipa);
             LOG(F("IP static: "));
             LOGN(Ethernet.localIP());
             memset(PoolControlContext::instance()->data.clientIP, 0, 16);
             IPAddress2String(Ethernet.localIP(), PoolControlContext::instance()->data.clientIP);
 
-            if (mdns.begin(Ethernet.localIP(), mdnsName))
+            if (mdns.begin(mdnsName))
             {
-                LOGN(F("MDNS initialized"));
+                LOGN(F("MDNS initialized (minimal responder)"));
             }
 
-            mdns.addServiceRecord("Pool Controllino mDNS Webserver._http",
-                                  80,
-                                  MDNSServiceTCP);
             Udp.begin(13001);
         }
 

@@ -88,6 +88,7 @@ public:
     TimeSpan waterPumpRuntimeBeforeInjection;
     TimeSpan waterPumpOffWhenFlowswitchOffTime;
     unsigned long pumpManualOverrideTimeoutSeconds{1800}; // Default: 30 minutes (1800 seconds)
+    char ipAddress[16]{"192.168.42.220"};                 // Static IP, configurable via <IP>/config
     char switchConfigRaw[768]{0};
 
     char *toJson(char *buffer, size_t size)
@@ -115,6 +116,7 @@ public:
         config["waterPumpRuntimeBeforeInjection"] = waterPumpRuntimeBeforeInjection.totalseconds();
         config["waterPumpOffWhenFlowswitchOffTime"] = waterPumpOffWhenFlowswitchOffTime.totalseconds();
         config["pumpManualOverrideTimeoutSeconds"] = pumpManualOverrideTimeoutSeconds;
+        config["ipAddress"] = ipAddress;
 
         serializeJson(config, buffer, size);
         return buffer;
@@ -190,6 +192,16 @@ public:
         if (config.containsKey("pumpManualOverrideTimeoutSeconds"))
         {
             pumpManualOverrideTimeoutSeconds = config["pumpManualOverrideTimeoutSeconds"].as<unsigned long>();
+        }
+
+        if (config.containsKey("ipAddress"))
+        {
+            const char *ip = config["ipAddress"];
+            if (ip && ip[0])
+            {
+                strncpy(ipAddress, ip, sizeof(ipAddress) - 1);
+                ipAddress[sizeof(ipAddress) - 1] = '\0';
+            }
         }
     }
 };
