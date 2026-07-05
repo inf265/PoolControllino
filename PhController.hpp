@@ -20,7 +20,8 @@ public:
     PhController() : injectionPump(PHPUMP_PIN,
                                    PoolControlContext::instance()->config.phPumpCycleRunTime,
                                    PoolControlContext::instance()->config.phPumpCyclePauseTime,
-                                   PoolControlContext::instance()->config.phPumpMaxRuntime) {}
+                                   PoolControlContext::instance()->config.phPumpMaxRuntime,
+                                   "pH") {}
     void init()
     {
         pinMode(PHPUMP_PIN, OUTPUT);
@@ -29,7 +30,8 @@ public:
         injectionPump.init(PHPUMP_PIN,
                            PoolControlContext::instance()->config.phPumpCycleRunTime,
                            PoolControlContext::instance()->config.phPumpCyclePauseTime,
-                           PoolControlContext::instance()->config.phPumpMaxRuntime);
+                           PoolControlContext::instance()->config.phPumpMaxRuntime,
+                           "pH");
     }
     /**
      * @brief Run pH injection control

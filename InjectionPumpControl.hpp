@@ -31,12 +31,13 @@ class InjectionPumpControl
 {
 public:
     InjectionPumpControl(uint8_t pumpPin, TimeSpan pumpCycleRunTime, TimeSpan pumpCyclePauseTime,
-                         TimeSpan pumpMaxRuntime) : runState(RunState::OFF)
+                         TimeSpan pumpMaxRuntime, const char *pumpName = nullptr) : runState(RunState::OFF)
     {
         this->pumpPin = pumpPin;
         this->pumpCycleRunTime = pumpCycleRunTime;
         this->pumpCyclePauseTime = pumpCyclePauseTime;
         this->pumpMaxRuntime = pumpMaxRuntime;
+        this->pumpName = pumpName;
         this->totalPumpRuntime = TimeSpan(0);
         this->currentCycleRuntime = TimeSpan(0);
     }
@@ -44,13 +45,14 @@ public:
     InjectionPumpControl() = delete;
 
     void init(uint8_t pumpPin, TimeSpan pumpCycleRunTime, TimeSpan pumpCyclePauseTime,
-              TimeSpan pumpMaxRuntime)
+              TimeSpan pumpMaxRuntime, const char *pumpName = nullptr)
     {
         runState = RunState::OFF;
         this->pumpPin = pumpPin;
         this->pumpCycleRunTime = pumpCycleRunTime;
         this->pumpCyclePauseTime = pumpCyclePauseTime;
         this->pumpMaxRuntime = pumpMaxRuntime;
+        this->pumpName = pumpName;
         this->totalPumpRuntime = TimeSpan(0);
         this->currentCycleRuntime = TimeSpan(0);
     }
@@ -237,6 +239,7 @@ private:
     TimeSpan pumpCycleRunTime;
     TimeSpan pumpCyclePauseTime;
     TimeSpan pumpMaxRuntime;
+    const char *pumpName{nullptr}; // label used in the "max injection time" warning
 
     bool cycleRunTimeExceed()
     {
@@ -270,10 +273,19 @@ private:
 
         if (actualTotalRuntime.totalseconds() >= pumpMaxRuntime.totalseconds())
         {
-            PoolControlContext::instance()->data.warning = true;
-            strncpy(PoolControlContext::instance()->data.warningText, "Max injection time exceeded.", sizeof(PoolControlContext::instance()->data.warningText) - 1);
-            PoolControlContext::instance()->data.warningText[sizeof(PoolControlContext::instance()->data.warningText) - 1] = '\0';
-            RealTimeClock::getFullDateTimeString(PoolControlContext::instance()->data.date, PoolControlContext::instance()->data.warningTimestamp);
+            auto *data = &PoolControlContext::instance()->data;
+            data->warning = true;
+            if (pumpName)
+            {
+                snprintf(data->warningText, sizeof(data->warningText),
+                         "Max injection time exceeded (%s).", pumpName);
+            }
+            else
+            {
+                strncpy(data->warningText, "Max injection time exceeded.", sizeof(data->warningText) - 1);
+                data->warningText[sizeof(data->warningText) - 1] = '\0';
+            }
+            RealTimeClock::getFullDateTimeString(data->date, data->warningTimestamp);
             return true;
         }
         return false;

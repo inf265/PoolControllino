@@ -22,7 +22,8 @@ public:
     ChlorineController() : injectionPump(CHLORINEPUMP_PIN,
                                          PoolControlContext::instance()->config.chlorinePumpCycleRunTime,
                                          PoolControlContext::instance()->config.chlorinePumpCyclePauseTime,
-                                         PoolControlContext::instance()->config.chlorinePumpMaxRuntime) {}
+                                         PoolControlContext::instance()->config.chlorinePumpMaxRuntime,
+                                         "chlorine") {}
     void init()
     {
         pinMode(CHLORINEPUMP_PIN, OUTPUT);
@@ -31,7 +32,8 @@ public:
         injectionPump.init(CHLORINEPUMP_PIN,
                            PoolControlContext::instance()->config.chlorinePumpCycleRunTime,
                            PoolControlContext::instance()->config.chlorinePumpCyclePauseTime,
-                           PoolControlContext::instance()->config.chlorinePumpMaxRuntime);
+                           PoolControlContext::instance()->config.chlorinePumpMaxRuntime,
+                           "chlorine");
     }
     /**
      * @brief Run chlorine injection control
