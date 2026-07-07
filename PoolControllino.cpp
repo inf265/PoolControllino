@@ -47,14 +47,14 @@ void setup()
     // Load configuration from EEPROM BEFORE networking, so the static IP
     // (Configuration::ipAddress, editable via <IP>/config, default 192.168.42.220)
     // is available when Ethernet is brought up.
-    if (!eeprom.readConfig(PoolControlContext::instance()->config.switchConfigRaw, 768))
+    if (!eeprom.readConfig(PoolControlContext::instance()->config.switchConfigRaw, 900))
     {
         LOGN(F("Read Config"));
     }
     else
     {
         LOG(F("No Config present. Writing initial config with defaults, len:"));
-        PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 768);
+        PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 900);
         eeprom.writeConfig(PoolControlContext::instance()->config.switchConfigRaw, strlen(PoolControlContext::instance()->config.switchConfigRaw));
     }
     {
@@ -65,7 +65,7 @@ void setup()
     // Re-serialize so the /config editor always reflects the full current
     // configuration, including fields (like ipAddress) that a stored config
     // predating them may not yet contain.
-    PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 768);
+    PoolControlContext::instance()->config.toJson(PoolControlContext::instance()->config.switchConfigRaw, 900);
     LOGN(PoolControlContext::instance()->config.switchConfigRaw);
 
     networking.setup(eeprom.macAddress);

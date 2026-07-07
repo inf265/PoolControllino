@@ -89,7 +89,9 @@ public:
     TimeSpan waterPumpOffWhenFlowswitchOffTime;
     unsigned long pumpManualOverrideTimeoutSeconds{1800}; // Default: 30 minutes (1800 seconds)
     char ipAddress[16]{"192.168.42.220"};                 // Static IP, configurable via <IP>/config
-    char switchConfigRaw[768]{0};
+    char ntpServer[16]{"162.159.200.123"};                // time.cloudflare.com (anycast IP), configurable via <IP>/config
+    uint8_t ntpSyncHour{4};                               // Hour (0-23) for the daily NTP sync; only runs while all pumps are off
+    char switchConfigRaw[900]{0};
 
     char *toJson(char *buffer, size_t size)
     {
@@ -117,6 +119,8 @@ public:
         config["waterPumpOffWhenFlowswitchOffTime"] = waterPumpOffWhenFlowswitchOffTime.totalseconds();
         config["pumpManualOverrideTimeoutSeconds"] = pumpManualOverrideTimeoutSeconds;
         config["ipAddress"] = ipAddress;
+        config["ntpServer"] = ntpServer;
+        config["ntpSyncHour"] = ntpSyncHour;
 
         serializeJson(config, buffer, size);
         return buffer;
@@ -202,6 +206,21 @@ public:
                 strncpy(ipAddress, ip, sizeof(ipAddress) - 1);
                 ipAddress[sizeof(ipAddress) - 1] = '\0';
             }
+        }
+
+        if (config.containsKey("ntpServer"))
+        {
+            const char *s = config["ntpServer"];
+            if (s && s[0])
+            {
+                strncpy(ntpServer, s, sizeof(ntpServer) - 1);
+                ntpServer[sizeof(ntpServer) - 1] = '\0';
+            }
+        }
+
+        if (config.containsKey("ntpSyncHour"))
+        {
+            ntpSyncHour = config["ntpSyncHour"].as<uint8_t>();
         }
     }
 };

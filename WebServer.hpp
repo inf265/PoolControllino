@@ -212,8 +212,8 @@ namespace HC
         }
 
 // Must be large enough to hold the full config JSON POSTed to /config.
-// switchConfigRaw is 768 bytes, so keep this comfortably above it.
-#define TMPMEM_SIZE 800
+// switchConfigRaw is 900 bytes, so keep this comfortably above it.
+#define TMPMEM_SIZE 950
 
         void handlePost(EthernetClient client, SERVICE service)
         {
@@ -289,7 +289,7 @@ namespace HC
                 // Simple JSON validation without full deserialization (saves memory)
                 // Check basic structure: starts with {, ends with }, braces match, size fits
                 size_t jsonLen = strlen(tmpMem);
-                if (jsonLen > 0 && jsonLen < 768 && tmpMem[0] == '{' && tmpMem[jsonLen - 1] == '}')
+                if (jsonLen > 0 && jsonLen < 900 && tmpMem[0] == '{' && tmpMem[jsonLen - 1] == '}')
                 {
                     // Count braces to ensure they match
                     int braceCount = 0;
@@ -317,7 +317,7 @@ namespace HC
                 }
                 else
                 {
-                    LOGN(F("Invalid JSON: must start with {, end with }, and be < 768 bytes"));
+                    LOGN(F("Invalid JSON: must start with {, end with }, and be < 900 bytes"));
                 }
             }
             if (service == SERVICE::TOGGLE)
